@@ -28,6 +28,27 @@ import sonnet as snt
 import tensorflow as tf
 
 import access
+import tgu
+
+
+def get_cell(num_hidden, cell_type, cell_num):
+  """Gets an RNN cell"""
+  if cell_type == "lstm":
+    return snt.LSTM(num_hidden, name="lstm_{}".format(cell_num))
+  if cell_type == "tgu":
+    return tgu.TGU(num_hidden, num_hidden//2, name="tgu_{}".format(cell_num))
+
+def get_controller(hidden_size, cell_type, depth):
+  """Gets a controller module"""
+  cells = [get_cell(hidden_size, cell_type, i) for i in range(depth)]
+
+  if len(cells) > 1:
+    controller = snt.DeepRNN(cells, skip_connections=False)
+  else:
+    controller = cells[0]
+
+  return controller
+
 
 DNCState = collections.namedtuple('DNCState', ('access_output', 'access_state',
                                                'controller_state'))
@@ -62,7 +83,7 @@ class DNC(snt.RNNCore):
     super(DNC, self).__init__(name=name)
 
     with self._enter_variable_scope():
-      self._controller = snt.LSTM(**controller_config)
+      self._controller = get_controller(**controller_config)
       self._access = access.MemoryAccess(**access_config)
 
     self._access_output_size = np.prod(self._access.output_size.as_list())

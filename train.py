@@ -22,18 +22,24 @@ import tensorflow as tf
 import sonnet as snt
 
 import dnc
+import tgu
 import repeat_copy
 
 FLAGS = tf.flags.FLAGS
 
 # Model parameters
 tf.flags.DEFINE_integer("hidden_size", 64, "Size of LSTM hidden layer.")
+tf.flags.DEFINE_integer("depth", 1, "Depth of RNN controller.")
 tf.flags.DEFINE_integer("memory_size", 16, "The number of memory slots.")
 tf.flags.DEFINE_integer("word_size", 16, "The width of each memory slot.")
 tf.flags.DEFINE_integer("num_write_heads", 1, "Number of memory write heads.")
 tf.flags.DEFINE_integer("num_read_heads", 4, "Number of memory read heads.")
 tf.flags.DEFINE_integer("clip_value", 20,
                         "Maximum absolute value of controller and dnc outputs.")
+tf.flags.DEFINE_string("controller_type", "lstm",
+                       "Which RNN to use as the controller")
+tf.flags.DEFINE_bool("use_dnc", True,
+                     "Whether to use the DNC or the raw controller rnn")
 
 # Optimizer parameters.
 tf.flags.DEFINE_float("max_grad_norm", 50, "Gradient clipping norm limit.")
@@ -64,6 +70,8 @@ tf.flags.DEFINE_string("checkpoint_dir", "/tmp/tf/dnc",
                        "Checkpointing directory.")
 tf.flags.DEFINE_integer("checkpoint_interval", -1,
                         "Checkpointing step interval.")
+tf.flags.DEFINE_integer("summary_interval", -1,
+                        "Summary step interval.")
 
 
 def run_model(input_sequence, output_size):
@@ -75,18 +83,33 @@ def run_model(input_sequence, output_size):
       "num_reads": FLAGS.num_read_heads,
       "num_writes": FLAGS.num_write_heads,
   }
+
   controller_config = {
       "hidden_size": FLAGS.hidden_size,
+      "depth": FLAGS.depth,
+      "cell_type": FLAGS.controller_type
   }
+
   clip_value = FLAGS.clip_value
 
-  dnc_core = dnc.DNC(access_config, controller_config, output_size, clip_value)
+  if FLAGS.use_dnc:
+    dnc_core = dnc.DNC(access_config,
+                       controller_config,
+                       output_size,
+                       clip_value)
+  else:
+    dnc_core = dnc.get_controller(**controller_config)
   initial_state = dnc_core.initial_state(FLAGS.batch_size)
   output_sequence, _ = tf.nn.dynamic_rnn(
       cell=dnc_core,
       inputs=input_sequence,
       time_major=True,
       initial_state=initial_state)
+
+  # NB
+  if output_sequence.get_shape()[-1] != output_size:
+    final_projection = snt.BatchApply(snt.Linear(output_size))
+    output_sequence = final_projection(output_sequence)
 
   return output_sequence
 
@@ -106,6 +129,7 @@ def train(num_training_iterations, report_interval):
 
   train_loss = dataset.cost(output_logits, dataset_tensors.target,
                             dataset_tensors.mask)
+  tf.summary.scalar('train_loss', train_loss)
 
   # Set up optimizer with global norm clipping.
   trainable_variables = tf.trainable_variables()
@@ -136,6 +160,11 @@ def train(num_training_iterations, report_interval):
     ]
   else:
     hooks = []
+  if FLAGS.summary_interval > 0:
+    hooks.append(tf.train.SummarySaverHook(
+        save_steps=FLAGS.summary_interval,
+        output_dir=FLAGS.checkpoint_dir,
+        summary_op=tf.summary.merge_all()))
 
   # Train.
   with tf.train.SingularMonitoredSession(
