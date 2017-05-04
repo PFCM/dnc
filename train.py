@@ -22,7 +22,6 @@ import tensorflow as tf
 import sonnet as snt
 
 import dnc
-import tgu
 import repeat_copy
 
 FLAGS = tf.flags.FLAGS
@@ -184,8 +183,13 @@ def train(num_training_iterations, report_interval):
         tf.logging.info("%d: Avg training loss %f.\n%s",
                         train_iteration, total_loss / report_interval,
                         dataset_string)
+        if (total_loss / report_interval) <= 1.0:
+          # got it
+          tf.logging.info('Training loss below 1.0, exiting early.')
+          break
         total_loss = 0
-
+  # monitored session should clean up after itself?
+  tf.logging.info("Finished")
 
 def main(unused_argv):
   tf.logging.set_verbosity(3)  # Print INFO log messages.
