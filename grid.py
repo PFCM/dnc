@@ -23,10 +23,11 @@ PARAMETERS = {
     'max_length': [10],
     'num_bits': [8],
     'max_repeats': [10],
+    'task': ['variable_assignment'],
     # bookkeeping
     'summary_interval': [200],
     'checkpoint_interval': [500],
-    'num_training_iterations': [20000],
+    'num_training_iterations': [90000],
     # (checkpoint_dir we'll do dynamically)
     # optimisation
     'learning_rate': [1e-3, 1e-4, 1e-5],
@@ -34,14 +35,14 @@ PARAMETERS = {
     # model specifics
     'depth': [3],  # (we'll ignore this if use_dnc is True)
     'hidden_size': [512],  # override to 100 if use_dnc
-    'use_dnc': [True, False],
-    'controller_type': ['lstm', 'tgu'],
-    'memory_size': [128],
+    'use_dnc': [True, False], #, True],
+    'controller_type': ['tguv2tanh', 'tguv2sigmoid', 'tgu', 'lstm'],
+    'memory_size': [64],
     'word_size': [20],
-    'num_read_heads': [1]
+    'num_read_heads': [2]
 }
 
-CHECKPOINT_BASE = '/media/storage/dnc/runs/repeat_copy/10x10/grid'
+CHECKPOINT_BASE = '/media/storage/dnc/runs/variable_assignment'
 
 
 FLAGS = tf.app.flags.FLAGS
@@ -95,6 +96,16 @@ def run_search():
     if params.get('use_dnc', False):
       params['hidden_size'] = 100
       params['depth'] = 1
+      # don't overdo the dncs
+      if 'tgu' in params['controller_type']:
+        params['controller_type'] = 'tguv2tanh'
+
+    if params['task'] == 'repeat_copy':
+      params['stop_threshold'] = 1.0  # really quite low
+    elif params['task'] == 'variable_assignment':
+      params['stop_threshold'] = 1e-5
+      params['depth'] = 1  # for better comparision with ALSTM paper
+      params['num_training_iterations'] *= 5  # these are much faster
 
     # if the directory exists, it's a duplicate so skip it
     try:
