@@ -37,6 +37,15 @@ def get_cell(num_hidden, cell_type, cell_num):
     return snt.LSTM(num_hidden, name="lstm_{}".format(cell_num))
   if cell_type == "tgu":
     return tgu.TGU(num_hidden, num_hidden//2, name="tgu_{}".format(cell_num))
+  if "tguv2" in cell_type:
+    if "sigmoid" in cell_type:
+      output_nonlin = tf.nn.sigmoid
+    else:
+      output_nonlin = tf.nn.tanh
+    return tgu.TGU(num_hidden, num_hidden//2, v2=True,
+                   output_nonlin=output_nonlin,
+                   name="tgu_{}".format(cell_num))
+
 
 def get_controller(hidden_size, cell_type, depth):
   """Gets a controller module"""

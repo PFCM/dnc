@@ -70,7 +70,7 @@ class CPBilinear(snt.AbstractModule):
 
 
 class TGU(snt.RNNCore):
-  """
+  r"""
   Tensor gate unit RNN core.
 
   Implements the following for input x_t:
@@ -78,19 +78,29 @@ class TGU(snt.RNNCore):
     f_t = \sigma(x_tW_fc_{t-1})  (tensor product)
     c_t = f_t . c_{t-1} + (1-f_t) . c_t
     h_t = \tau(x_tW_hc_t)  (tensor product)
+
+    if v2 is true, then the final line is replaced with
+    h_t = \tau(x_tWc_{t-1})  to provide a cleaner path for the x_t
   """
 
-  def __init__(self, num_units, rank, name='tgu'):
+  def __init__(self, num_units, rank, v2=False, output_nonlin=tf.nn.tanh,
+               name='tgu'):
     """
     Sets up the TGU.
 
     Args:
       num_units (int): the number of hidden units.
       rank (int): the rank of the two tensor decompositions.
+      v2 (Optional[bool]): whether to use the more sensible v2 version of the
+        architecture.
+      output_nonlin (Optional[callable]): activation function applied to the
+        output tensor product.
       name (Optional[str]): name for the module.
     """
     super(TGU, self).__init__(name=name)
     self._hidden_size = num_units
+    self._v2 = v2
+    self._output_nonlin = output_nonlin
 
     with self._enter_variable_scope():
       self._input_projection = snt.Linear(num_units,
@@ -120,7 +130,10 @@ class TGU(snt.RNNCore):
 
     new_states = forget_gate * states + (1.0 - forget_gate) * candidate
 
-    outputs = tf.nn.tanh(self._output_activations(inputs, new_states))
+    if self._v2:
+      outputs = tf.nn.tanh(self._output_activations(inputs, states))
+    else:
+      outputs = tf.nn.tanh(self._output_activations(inputs, new_states))
 
     return outputs, new_states
 
