@@ -23,6 +23,7 @@ import sonnet as snt
 
 import dnc
 import repeat_copy
+import variable_assignment
 
 FLAGS = tf.flags.FLAGS
 
@@ -47,6 +48,9 @@ tf.flags.DEFINE_float("optimizer_epsilon", 1e-10,
                       "Epsilon used for RMSProp optimizer.")
 
 # Task parameters
+tf.flags.DEFINE_string("task", "repeat_copy",
+                       "`repeat_copy` or `variable_assignment`: "
+                       "the task we are training on.")
 tf.flags.DEFINE_integer("batch_size", 16, "Batch size for training.")
 tf.flags.DEFINE_integer("num_bits", 4, "Dimensionality of each vector to copy")
 tf.flags.DEFINE_integer(
@@ -71,10 +75,16 @@ tf.flags.DEFINE_integer("checkpoint_interval", -1,
                         "Checkpointing step interval.")
 tf.flags.DEFINE_integer("summary_interval", -1,
                         "Summary step interval.")
+tf.flags.DEFINE_float('stop_threshold', 1.0, 'threshold for early stopping')
 
 
 def run_model(input_sequence, output_size):
   """Runs model on input sequence."""
+
+  if input_sequence.dtype == tf.int32:
+    input_sequence = tf.one_hot(input_sequence,
+                                output_size,
+                                dtype=tf.float32)
 
   access_config = {
       "memory_size": FLAGS.memory_size,
@@ -116,9 +126,15 @@ def run_model(input_sequence, output_size):
 def train(num_training_iterations, report_interval):
   """Trains the DNC and periodically reports the loss."""
 
-  dataset = repeat_copy.RepeatCopy(FLAGS.num_bits, FLAGS.batch_size,
-                                   FLAGS.min_length, FLAGS.max_length,
-                                   FLAGS.min_repeats, FLAGS.max_repeats)
+  if FLAGS.task == "repeat_copy":
+    dataset = repeat_copy.RepeatCopy(FLAGS.num_bits, FLAGS.batch_size,
+                                     FLAGS.min_length, FLAGS.max_length,
+                                     FLAGS.min_repeats, FLAGS.max_repeats)
+  elif FLAGS.task == "variable_assignment":
+    dataset = variable_assignment.VariableAssignment(FLAGS.batch_size)
+  else:
+    raise ValueError("Unknown task: {}".format(FLAGS.task))
+
   dataset_tensors = dataset()
 
   output_logits = run_model(dataset_tensors.observations, dataset.target_size)
@@ -183,9 +199,10 @@ def train(num_training_iterations, report_interval):
         tf.logging.info("%d: Avg training loss %f.\n%s",
                         train_iteration, total_loss / report_interval,
                         dataset_string)
-        if (total_loss / report_interval) <= 1.0:
+        if (total_loss / report_interval) <= FLAGS.stop_threshold:
           # got it
-          tf.logging.info('Training loss below 1.0, exiting early.')
+          tf.logging.info('Training loss below %f, exiting early.',
+                          FLAGS.stop_threshold)
           break
         total_loss = 0
   # monitored session should clean up after itself?
