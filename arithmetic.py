@@ -83,20 +83,22 @@ def intstring_readable(data, batch_size, model_output=None,
   Returns:
     A string used to visualise the data batch
   """
-  vocab = {i: i for i in xrange(10)}  # 0-9
+  vocab = {i: '{}'.format(i) for i in xrange(10)}  # 0-9
   vocab[10] = ' '
-  vocab[11] = '+'
-  vocab[12] = '-'
+  vocab[11] = '-'
+  vocab[12] = '+'
   vocab[13] = '='
   def _readable(datum):
     return '+ ' + ''.join([vocab[x] for x in datum]) + ' +'
 
-  obs_batch = data.observations
+  obs_batch = np.argmax(data.observations, axis=2)
   targ_batch = data.target
   if model_output is not None:
     model_output = np.argmax(model_output, axis=2)
 
   iterate_over = xrange(batch_size) if whole_batch else xrange(1)
+
+  sep = ('~' * 32) + '\n'
 
   batch_strings = []
   for batch_index in iterate_over:
@@ -105,15 +107,16 @@ def intstring_readable(data, batch_size, model_output=None,
 
     obs_channel_string = _readable(obs)
     targ_channel_string = _readable(targ)
-
-    readable_obs = 'Observations:\n' + obs_channel_string
-    readable_targ = 'Targets:\n' + targ_channel_string
+    
+    
+    readable_obs = sep + 'Observations:\n' + obs_channel_string
+    readable_targ = sep + 'Targets:\n' + targ_channel_string
     strings = [readable_obs, readable_targ]
 
     if model_output is not None:
       output = model_output[:, batch_index]
-      output_string = _readable(output)
-      strings.append('Model Output:\n' + output_string)
+      output_string = ' '*21 + _readable(output[21:])
+      strings.append(sep + 'Model Output:\n' + output_string)
 
     batch_strings.append('\n\n'.join(strings))
 
@@ -218,6 +221,7 @@ class Addition(snt.AbstractModule):
     # of the characters we need
     with self._enter_variable_scope():
       indices = [[ord(char), i] for i, char in enumerate('0123456789 -+=')]
+      indices = sorted(indices, key=lambda x: x[0])
       self._one_hots = tf.sparse_to_dense(indices, [128, 14], tf.ones([14]))
 
   @property
@@ -244,7 +248,7 @@ class Addition(snt.AbstractModule):
                                 dtype=tf.int32)
     target = input_a + input_b
     plus = tf.constant('+')
-    equals = tf.constant('='*9)
+    equals = tf.constant('='*11)
 
     str_obs = tf.string_join([tf.as_string(input_a,
                                            width=9),
@@ -254,6 +258,7 @@ class Addition(snt.AbstractModule):
                               equals])
     # decode then cast so we only do one byte at a time
     int_obs = tf.cast(tf.decode_raw(str_obs, tf.uint8), tf.int32)
+    int_obs = tf.transpose(int_obs)
     # now map the ascii codes down to appropriately sized one-hots
     obs = tf.gather(self._one_hots, int_obs)
 
@@ -261,12 +266,16 @@ class Addition(snt.AbstractModule):
     str_targ = tf.as_string(target,
                             width=30)  # left pad by default
     int_targ = tf.cast(tf.decode_raw(str_targ, tf.uint8), tf.int32)
+    int_targ = tf.transpose(int_targ)
     targ = tf.gather(self._one_hots, int_targ)[:, :, :13]
-
+    targ = tf.cast(tf.argmax(targ, axis=-1), tf.int32)
     # the mask is always the same
     mask = tf.concat([tf.zeros([20, self._batch_size]),
-                      tf.ones([10, self._batch_size])])
-
+                      tf.ones([10, self._batch_size])],
+                     0)
+    obs.set_shape([30, self._batch_size, 14])
+    targ.set_shape([30, self._batch_size])
+    print(obs.get_shape(), targ.get_shape(), mask.get_shape())
     return DatasetTensors(obs, targ, mask)
 
   def cost(self, logits, targ, mask):
