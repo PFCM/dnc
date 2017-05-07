@@ -22,6 +22,7 @@ import tensorflow as tf
 import sonnet as snt
 
 import dnc
+import arithmetic
 import repeat_copy
 import variable_assignment
 
@@ -132,6 +133,8 @@ def train(num_training_iterations, report_interval):
                                      FLAGS.min_repeats, FLAGS.max_repeats)
   elif FLAGS.task == "variable_assignment":
     dataset = variable_assignment.VariableAssignment(FLAGS.batch_size)
+  elif FLAGS.task == "addition":
+    dataset = arithmetic.Addition(FLAGS.batch_size)
   else:
     raise ValueError("Unknown task: {}".format(FLAGS.task))
 
