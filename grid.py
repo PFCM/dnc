@@ -23,7 +23,7 @@ PARAMETERS = {
     'max_length': [10],
     'num_bits': [8],
     'max_repeats': [10],
-    'task': ['variable_assignment'],
+    'task': ['variable_binding'],
     # bookkeeping
     'summary_interval': [200],
     'checkpoint_interval': [500],
@@ -33,16 +33,16 @@ PARAMETERS = {
     'learning_rate': [1e-3, 1e-4, 1e-5],
     'batch_size': [32],
     # model specifics
-    'depth': [3],  # (we'll ignore this if use_dnc is True)
-    'hidden_size': [512],  # override to 100 if use_dnc
-    'use_dnc': [True, False], #, True],
-    'controller_type': ['tguv2tanh', 'tguv2sigmoid', 'tgu', 'lstm'],
+    'depth': [2],  # (we'll ignore this if use_dnc is True)
+    'hidden_size': [256],  # override to 100 if use_dnc
+    'use_dnc': [False], #, True],
+    'controller_type': ['tguv2tanh', 'tguv2sigmoid', 'lstm'],
     'memory_size': [64],
     'word_size': [20],
     'num_read_heads': [2]
 }
 
-CHECKPOINT_BASE = '/media/storage/dnc/runs/variable_assignment'
+CHECKPOINT_BASE = '/media/storage/dnc/runs/addition'
 
 
 FLAGS = tf.app.flags.FLAGS

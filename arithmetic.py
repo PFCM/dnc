@@ -107,15 +107,16 @@ def intstring_readable(data, batch_size, model_output=None,
 
     obs_channel_string = _readable(obs)
     targ_channel_string = _readable(targ)
-    
-    
+
+
     readable_obs = sep + 'Observations:\n' + obs_channel_string
     readable_targ = sep + 'Targets:\n' + targ_channel_string
     strings = [readable_obs, readable_targ]
 
     if model_output is not None:
       output = model_output[:, batch_index]
-      output_string = ' '*21 + _readable(output[21:])
+      output[:21] = 10
+      output_string = _readable(output)
       strings.append(sep + 'Model Output:\n' + output_string)
 
     batch_strings.append('\n\n'.join(strings))

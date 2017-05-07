@@ -132,7 +132,8 @@ def train(num_training_iterations, report_interval):
                                      FLAGS.min_length, FLAGS.max_length,
                                      FLAGS.min_repeats, FLAGS.max_repeats)
   elif FLAGS.task == "variable_assignment":
-    dataset = variable_assignment.VariableAssignment(FLAGS.batch_size)
+    dataset = variable_assignment.VariableAssignment(FLAGS.batch_size,
+                                                     log_prob_in_bits=True)
   elif FLAGS.task == "addition":
     dataset = arithmetic.Addition(FLAGS.batch_size)
   else:

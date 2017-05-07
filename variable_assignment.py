@@ -297,7 +297,7 @@ class VariableAssignment(snt.AbstractModule):
         logits,
         targ,
         mask,
-        time_average=False,
+        time_average=True,
         log_prob_in_bits=self.log_prob_in_bits)
 
   def to_human_readable(self, data, model_output=None, whole_batch=False):
