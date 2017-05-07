@@ -105,7 +105,7 @@ def run_search():
     elif params['task'] == 'variable_assignment':
       params['stop_threshold'] = 1e-5
       params['depth'] = 1  # for better comparision with ALSTM paper
-      params['num_training_iterations'] *= 5  # these are much faster
+      # params['num_training_iterations'] *= 5  # these are much faster
 
     # if the directory exists, it's a duplicate so skip it
     try:
