@@ -45,6 +45,10 @@ def get_cell(num_hidden, cell_type, cell_num):
     return tgu.TGU(num_hidden, num_hidden//2, v2=True,
                    output_nonlin=output_nonlin,
                    name="tgu_{}".format(cell_num))
+  if cell_type == "gru":
+    return snt.GRU(num_hidden, name="gru_{}".format(cell_num))
+
+  raise ValueError("Unknown cell: {}".format(cell_type))
 
 
 def get_controller(hidden_size, cell_type, depth):
