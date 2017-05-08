@@ -10,6 +10,7 @@ from __future__ import print_function
 from __future__ import division
 
 import os
+import time
 import json
 import itertools
 
@@ -23,26 +24,26 @@ PARAMETERS = {
     'max_length': [10],
     'num_bits': [8],
     'max_repeats': [10],
-    'task': ['variable_binding'],
+    'task': ['addition'],
     # bookkeeping
     'summary_interval': [200],
     'checkpoint_interval': [500],
     'num_training_iterations': [90000],
     # (checkpoint_dir we'll do dynamically)
     # optimisation
-    'learning_rate': [1e-3, 1e-4, 1e-5],
+    'learning_rate': [1e-2, 1e-3, 1e-4],
     'batch_size': [32],
     # model specifics
-    'depth': [2],  # (we'll ignore this if use_dnc is True)
-    'hidden_size': [256],  # override to 100 if use_dnc
+    'depth': [1],  # (we'll ignore this if use_dnc is True)
+    'hidden_size': [512],  # override to 100 if use_dnc
     'use_dnc': [False], #, True],
-    'controller_type': ['tguv2tanh', 'tguv2sigmoid', 'lstm'],
+    'controller_type': ['tguv2tanh', 'tguv2sigmoid', 'lstm', 'gru'],
     'memory_size': [64],
     'word_size': [20],
     'num_read_heads': [2]
 }
 
-CHECKPOINT_BASE = '/media/storage/dnc/runs/addition'
+CHECKPOINT_BASE = '/media/storage/dnc/runs/{}/lessdecay'.format(PARAMETERS['task'][0])
 
 
 FLAGS = tf.app.flags.FLAGS
@@ -122,6 +123,9 @@ def run_search():
       total_runs += 1
     except OSError:
       print('skipping duplicate run')
+    except KeyboardInterrupt:
+      print('skipping interrupted run in a few seconds')
+      time.sleep(5)
 
   print('search finished, ran {} trials'.format(total_runs))
 
