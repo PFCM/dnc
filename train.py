@@ -162,9 +162,11 @@ def train(num_training_iterations, report_interval):
       initializer=tf.zeros_initializer(),
       trainable=False,
       collections=[tf.GraphKeys.GLOBAL_VARIABLES, tf.GraphKeys.GLOBAL_STEP])
-
+  lr = tf.train.exponential_decay(FLAGS.learning_rate, global_step,
+                                  decay_steps=10000, decay_rate=0.9)
+  tf.summary.scalar('learning_rate', lr)
   optimizer = tf.train.RMSPropOptimizer(
-      FLAGS.learning_rate, epsilon=FLAGS.optimizer_epsilon)
+      lr, epsilon=FLAGS.optimizer_epsilon)
   train_step = optimizer.apply_gradients(
       zip(grads, trainable_variables), global_step=global_step)
 
