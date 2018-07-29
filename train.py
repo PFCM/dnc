@@ -25,6 +25,7 @@ import dnc
 import arithmetic
 import repeat_copy
 import variable_assignment
+import copy_memory
 
 FLAGS = tf.flags.FLAGS
 
@@ -52,6 +53,8 @@ tf.flags.DEFINE_float("optimizer_epsilon", 1e-10,
 tf.flags.DEFINE_string("task", "repeat_copy",
                        "`repeat_copy` or `variable_assignment`: "
                        "the task we are training on.")
+tf.flags.DEFINE_integer("sequence_length", 100,
+                        "Number of blanks in the memory copy task")
 tf.flags.DEFINE_integer("batch_size", 16, "Batch size for training.")
 tf.flags.DEFINE_integer("num_bits", 4, "Dimensionality of each vector to copy")
 tf.flags.DEFINE_integer(
@@ -136,6 +139,11 @@ def train(num_training_iterations, report_interval):
                                                      log_prob_in_bits=True)
   elif FLAGS.task == "addition":
     dataset = arithmetic.Addition(FLAGS.batch_size)
+
+  elif FLAGS.task == "copy_memory":
+    dataset = copy_memory.CopyMemory(batch_size=FLAGS.batch_size,
+                                     num_blanks=FLAGS.sequence_length)
+
   else:
     raise ValueError("Unknown task: {}".format(FLAGS.task))
 
@@ -143,8 +151,11 @@ def train(num_training_iterations, report_interval):
 
   output_logits = run_model(dataset_tensors.observations, dataset.target_size)
   # Used for visualization.
-  output = tf.round(
-      tf.expand_dims(dataset_tensors.mask, -1) * tf.sigmoid(output_logits))
+  if FLAGS.task != "copy_memory":
+    output = tf.round(
+        tf.expand_dims(dataset_tensors.mask, -1) * tf.sigmoid(output_logits))
+  else:
+    output = output_logits  # fine to just argmax
 
   train_loss = dataset.cost(output_logits, dataset_tensors.target,
                             dataset_tensors.mask)
@@ -163,9 +174,10 @@ def train(num_training_iterations, report_interval):
       trainable=False,
       collections=[tf.GraphKeys.GLOBAL_VARIABLES, tf.GraphKeys.GLOBAL_STEP])
   lr = tf.train.exponential_decay(FLAGS.learning_rate, global_step,
-                                  decay_steps=10000, decay_rate=0.9)
+                                  decay_steps=30000, decay_rate=0.99,
+                                  staircase=True)
   tf.summary.scalar('learning_rate', lr)
-  optimizer = tf.train.RMSPropOptimizer(
+  optimizer = tf.train.AdamOptimizer(
       lr, epsilon=FLAGS.optimizer_epsilon)
   train_step = optimizer.apply_gradients(
       zip(grads, trainable_variables), global_step=global_step)
@@ -187,7 +199,7 @@ def train(num_training_iterations, report_interval):
         output_dir=FLAGS.checkpoint_dir,
         summary_op=tf.summary.merge_all()))
 
-  # Train.
+  # Train.=
   with tf.train.SingularMonitoredSession(
       hooks=hooks, checkpoint_dir=FLAGS.checkpoint_dir) as sess:
 

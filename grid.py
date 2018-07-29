@@ -11,6 +11,7 @@ from __future__ import division
 
 import os
 import time
+import string
 import json
 import itertools
 
@@ -24,26 +25,28 @@ PARAMETERS = {
     'max_length': [10],
     'num_bits': [8],
     'max_repeats': [10],
-    'task': ['addition'],
+    'sequence_length': [100, 200, 500, 1000, 10000],
+    'task': ['copy_memory'],
     # bookkeeping
     'summary_interval': [200],
-    'checkpoint_interval': [500],
-    'num_training_iterations': [90000],
+    'checkpoint_interval': [1000],
+    'num_training_iterations': [50000],
     # (checkpoint_dir we'll do dynamically)
     # optimisation
-    'learning_rate': [1e-2, 1e-3, 1e-4],
-    'batch_size': [32],
+    'learning_rate': [1e-3, 1e-2, 1e-4], #, 1e-3],
+    'batch_size': [16],
     # model specifics
     'depth': [1],  # (we'll ignore this if use_dnc is True)
-    'hidden_size': [512],  # override to 100 if use_dnc
+    'hidden_size': [128],  # override to 100 if use_dnc
     'use_dnc': [False], #, True],
-    'controller_type': ['tguv2tanh', 'tguv2sigmoid', 'lstm', 'gru'],
-    'memory_size': [64],
-    'word_size': [20],
-    'num_read_heads': [2]
+    'controller_type': ['tguv2sigmoid', 'tgu', 'gru', 'lstm'],
+    'memory_size': [32],
+    'word_size': [16],
+    'num_read_heads': [1],
+    'max_grad_norm': [100]
 }
 
-CHECKPOINT_BASE = '/media/storage/dnc/runs/{}/lessdecay'.format(PARAMETERS['task'][0])
+CHECKPOINT_BASE = '/media/storage/dnc/runs/{}/big_grid'.format(PARAMETERS['task'][0])
 
 
 FLAGS = tf.app.flags.FLAGS
@@ -91,7 +94,6 @@ def run_search():
   total_runs = 0
   for params in param_dicts():
     checkpoint_dir = make_checkpoint_path(params)
-    params['checkpoint_dir'] = checkpoint_dir
 
     # a few things to tidy up by hand
     if params.get('use_dnc', False):
@@ -99,33 +101,36 @@ def run_search():
       params['depth'] = 1
       # don't overdo the dncs
       if 'tgu' in params['controller_type']:
-        params['controller_type'] = 'tguv2tanh'
+        params['controller_type'] = 'tguv2sigmoid'
 
     if params['task'] == 'repeat_copy':
       params['stop_threshold'] = 1.0  # really quite low
     elif params['task'] == 'variable_assignment':
-      params['stop_threshold'] = 1e-5
+      params['stop_threshold'] = 1e-3
       params['depth'] = 1  # for better comparision with ALSTM paper
       # params['num_training_iterations'] *= 5  # these are much faster
 
-    # if the directory exists, it's a duplicate so skip it
-    try:
-      os.makedirs(checkpoint_dir)
-      print('-'*25)
-      print('Beginning trial {}'.format(total_runs+1))
-      print(checkpoint_dir)
-      dump_params(params, checkpoint_dir)
-      set_global_flags(params)
-      # make sure the runs are separated appropriately
-      with tf.Graph().as_default():
-        train.main(None)
+    for run in string.ascii_lowercase[:2]:
+      # if the directory exists, it's a duplicate so skip it
+      run_chkpt = os.path.join(checkpoint_dir, run)
+      try:
+        os.makedirs(run_chkpt)
+        params['checkpoint_dir'] = run_chkpt
+        print('-'*25)
+        print('Beginning trial {}'.format(total_runs+1))
+        print(run_chkpt)
+        dump_params(params, run_chkpt)
+        set_global_flags(params)
+        # make sure the runs are separated appropriately
+        with tf.Graph().as_default():
+          train.main(None)
 
-      total_runs += 1
-    except OSError:
-      print('skipping duplicate run')
-    except KeyboardInterrupt:
-      print('skipping interrupted run in a few seconds')
-      time.sleep(5)
+        total_runs += 1
+      except OSError:
+        print('skipping duplicate run')
+      except KeyboardInterrupt:
+        print('skipping interrupted run in a few seconds')
+        time.sleep(5)
 
   print('search finished, ran {} trials'.format(total_runs))
 
